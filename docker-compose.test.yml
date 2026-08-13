@@ -1,0 +1,55 @@
+name: wagering-test
+
+# Infra para test:integration e test:concurrency.
+#
+# Portas fixas distintas das de desenvolvimento, para os dois compose files
+# coexistirem. Deliberadamente NÃO usamos testcontainers: a integração com Bun
+# é instável e o custo de depurar isso não se paga neste escopo.
+#
+# Postgres e SQS são reais — substituí-los por mocks é falha eliminatória.
+
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: wagering_test
+      POSTGRES_USER: wagering
+      POSTGRES_PASSWORD: wagering
+    ports:
+      - "55432:5432"
+    # Testes de concorrência abrem muitas conexões em paralelo.
+    command:
+      - postgres
+      - -c
+      - max_connections=300
+      - -c
+      - fsync=off
+      - -c
+      - synchronous_commit=off
+      - -c
+      - full_page_writes=off
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wagering -d wagering_test"]
+      interval: 1s
+      timeout: 3s
+      retries: 60
+
+  ministack-test:
+    image: ministackorg/ministack
+    environment:
+      MINISTACK_REGION: us-east-1
+      MINISTACK_ACCOUNT_ID: "000000000000"
+    ports:
+      - "54566:4566"
+    # A imagem do MiniStack não tem curl nem wget — só python3.
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - import urllib.request;urllib.request.urlopen('http://localhost:4566/_ministack/health',timeout=3)
+      interval: 1s
+      timeout: 5s
+      retries: 60
