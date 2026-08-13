@@ -1,0 +1,42 @@
+// Casar uma forma de AST arbitrária não é expressável em regra de config do
+// Biome, só em plugin GritQL — que é onde estas duas proibições vivem.
+//
+// O escopo é `src/modules/*/domain/**` e vem do campo `includes` da entrada
+// deste plugin no biome.json, não daqui.
+engine biome(1.0)
+language js(typescript)
+
+or {
+  // Dinheiro nunca passa por ponto flutuante. Falha eliminatória do desafio.
+  `Number($_)` as $call where {
+    register_diagnostic(
+      span = $call,
+      message = "Use Money/Decimal. Converter valor monetário para number é falha eliminatória.",
+      severity = "error"
+    )
+  },
+
+  `Math.round($_)` as $call where {
+    register_diagnostic(
+      span = $call,
+      message = "Arredondamento monetário é responsabilidade do Decimal, não do Math.",
+      severity = "error"
+    )
+  },
+
+  `Math.floor($_)` as $call where {
+    register_diagnostic(
+      span = $call,
+      message = "Arredondamento monetário é responsabilidade do Decimal, não do Math.",
+      severity = "error"
+    )
+  },
+
+  `Math.ceil($_)` as $call where {
+    register_diagnostic(
+      span = $call,
+      message = "Arredondamento monetário é responsabilidade do Decimal, não do Math.",
+      severity = "error"
+    )
+  }
+}

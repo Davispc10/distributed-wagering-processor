@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+coverage/
+.DS_Store
+
+# dotcontext: docs, agents, skills e config são versionados;
+# plans e runtime são locais.
+.context/plans/
+.context/runtime/
+.context/cache/
+.context/**/archive/

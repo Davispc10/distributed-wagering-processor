@@ -1,0 +1,173 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "lineEnding": "lf"
+  },
+  "javascript": {
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    },
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "always",
+      "trailingCommas": "all",
+      "arrowParentheses": "always"
+    }
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "off"
+      }
+    }
+  },
+  "plugins": [
+    {
+      "path": "./lint/domain-money-purity.grit",
+      "includes": ["**/src/modules/*/domain/**/*.ts"]
+    }
+  ],
+  "linter": {
+    "enabled": true,
+    "domains": {
+      "types": "all"
+    },
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        "useImportType": "off",
+        "noNonNullAssertion": "off"
+      },
+      "complexity": {
+        "useLiteralKeys": "off"
+      },
+      "suspicious": {
+        "noConsole": "error",
+        "noUnnecessaryConditions": "off"
+      },
+      "nursery": {
+        "useExplicitType": "error",
+        "noFloatingPromises": "error",
+        "noMisusedPromises": "error"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["src/modules/*/domain/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useImportType": "error",
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "@nestjs/**",
+                      "@mikro-orm/**",
+                      "@aws-sdk/**",
+                      "pino",
+                      "prom-client",
+                      "class-validator",
+                      "class-transformer"
+                    ],
+                    "message": "domain/ deve permanecer puro: sem NestJS, ORM, AWS SDK ou libs de infraestrutura. Mova isso para infra/ e acesse via port."
+                  },
+                  {
+                    "group": ["**/infra/**", "**/shared/**", "@shared/**"],
+                    "message": "domain/ não pode depender de camadas externas. Inverta a dependência com um port em application/port."
+                  },
+                  {
+                    "group": ["**/application/**"],
+                    "message": "domain/ não conhece application/. A dependência é sempre application → domain."
+                  }
+                ]
+              }
+            },
+            "noRestrictedGlobals": {
+              "level": "error",
+              "options": {
+                "deniedGlobals": {
+                  "parseFloat": "Use Money/Decimal. number para dinheiro é falha eliminatória.",
+                  "parseInt": "Use Money/Decimal para valores monetários."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/modules/*/application/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@mikro-orm/**", "@aws-sdk/**", "pino", "express"],
+                    "message": "application/ fala com ports, não com implementações. Injete a dependência e declare a interface em application/port."
+                  },
+                  {
+                    "group": ["**/infra/**"],
+                    "message": "application/ não pode importar de infra/. A dependência é sempre infra → application."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/shared/persistence/migrations/*.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "useAwait": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/main-*.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["test/**/*.ts", "scripts/**/*.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          },
+          "nursery": {
+            "useExplicitType": "off"
+          }
+        }
+      }
+    }
+  ]
+}
