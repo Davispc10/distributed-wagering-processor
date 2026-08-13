@@ -1,0 +1,24 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+
+  # Credenciais da aplicação: é ambiente local com senha fake. Num ambiente
+  # compartilhado isto exigiria um usuário somente-leitura.
+  - name: Postgres
+    uid: postgres
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    database: wagering
+    user: wagering
+    secureJsonData:
+      password: wagering
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1600
