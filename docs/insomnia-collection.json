@@ -1,0 +1,335 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-08-13T22:44:40.676Z",
+  "__export_source": "mcp-insomnia",
+  "resources": [
+    {
+      "_id": "wrk_b03cf9b960f44d5aba106dc83cf1295a",
+      "_type": "workspace",
+      "name": "Wagering API — Backend Challenge",
+      "description": "Coleção da API de apostas (NestJS/Express). Base local: http://localhost:3000. Sem autenticação (AuthGuard é no-op por decisão em ARCHITECTURE.md §10). Rotas de health/metrics são públicas.",
+      "scope": "collection",
+      "modified": 1786631637851,
+      "created": 1786631637851
+    },
+    {
+      "_id": "fld_57f68848b58046c3887f14e29802c1e0",
+      "_type": "request_group",
+      "parentId": "wrk_b03cf9b960f44d5aba106dc83cf1295a",
+      "name": "Health",
+      "description": "Liveness, readiness e métricas Prometheus. Rotas públicas.",
+      "modified": 1786631641392,
+      "created": 1786631641392
+    },
+    {
+      "_id": "fld_0c464546503d42048a2fd3c17f211920",
+      "_type": "request_group",
+      "parentId": "wrk_b03cf9b960f44d5aba106dc83cf1295a",
+      "name": "Wallets",
+      "description": "Abertura de carteira, consulta de saldo, extrato (ledger) paginado por cursor e reconciliação.",
+      "modified": 1786631642940,
+      "created": 1786631642940
+    },
+    {
+      "_id": "fld_30bdcd6368a84f868edd8f6ba74370e0",
+      "_type": "request_group",
+      "parentId": "wrk_b03cf9b960f44d5aba106dc83cf1295a",
+      "name": "Wagering",
+      "description": "Submissão de transações de aposta (BET/WIN/LOSS/REFUND/ROLLBACK) e consultas por ID interno ou por provider + externalTransactionId.",
+      "modified": 1786631644105,
+      "created": 1786631644105
+    },
+    {
+      "_id": "req_4317a8ec3ee945f1a91c0b51a1f220a3",
+      "_type": "request",
+      "parentId": "fld_57f68848b58046c3887f14e29802c1e0",
+      "name": "GET Liveness",
+      "description": "Sempre 200 se o processo está de pé. Não toca em Postgres/SQS de propósito: com o banco fora queremos a instância fora do balanceador, não reiniciada em loop. Responde { status: \"alive\", uptimeSeconds }.",
+      "url": "{{ _.baseUrl }}/health/live",
+      "method": "GET",
+      "headers": [],
+      "parameters": [],
+      "modified": 1786631664880,
+      "created": 1786631664880
+    },
+    {
+      "_id": "req_48e7a7a190bc49fb9d4dbc9dcf5c6477",
+      "_type": "request",
+      "parentId": "fld_57f68848b58046c3887f14e29802c1e0",
+      "name": "GET Readiness",
+      "description": "Checa dependências externas. 200 quando status = \"ready\", 503 caso contrário. É este que o balanceador deve usar para tirar a instância de rotação.",
+      "url": "{{ _.baseUrl }}/health/ready",
+      "method": "GET",
+      "headers": [],
+      "parameters": [],
+      "modified": 1786631667001,
+      "created": 1786631667001
+    },
+    {
+      "_id": "req_999009b972374b7d81458c88aee8725f",
+      "_type": "request",
+      "parentId": "fld_57f68848b58046c3887f14e29802c1e0",
+      "name": "GET Prometheus metrics",
+      "description": "Exposition format do Prometheus (text/plain, não JSON). Responde com Cache-Control: no-store.",
+      "url": "{{ _.baseUrl }}/metrics",
+      "method": "GET",
+      "headers": [],
+      "parameters": [],
+      "modified": 1786631669044,
+      "created": 1786631669044
+    },
+    {
+      "_id": "req_e057880c707f495f842aa0e27ce3aa6a",
+      "_type": "request",
+      "parentId": "fld_0c464546503d42048a2fd3c17f211920",
+      "name": "POST Abrir carteira",
+      "description": "Cria a carteira e lança o crédito de abertura (kind interno OPENING). Retorna { id, playerId, balance, version } — copie o `id` para a variável de ambiente walletId. amount é string decimal com até 2 casas (sem notação científica nem separador de milhar); currency é ISO-4217 maiúsculo.",
+      "url": "{{ _.baseUrl }}/wallets",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"playerId\": \"{{ _.playerId }}\",\n  \"initialBalance\": {\n    \"amount\": \"1000.00\",\n    \"currency\": \"{{ _.currency }}\"\n  }\n}"
+      },
+      "modified": 1786631676597,
+      "created": 1786631676597
+    },
+    {
+      "_id": "req_4dd86429522d4e99ab3b59b1719d5722",
+      "_type": "request",
+      "parentId": "fld_0c464546503d42048a2fd3c17f211920",
+      "name": "GET Consultar carteira",
+      "description": "Saldo e versão atual (optimistic locking). walletId precisa ser UUIDv7 — ParseUUIDPipe({ version: '7' }) rejeita v4 com 400.",
+      "url": "{{ _.baseUrl }}/wallets/{{ _.walletId }}",
+      "method": "GET",
+      "headers": [],
+      "parameters": [],
+      "modified": 1786631678710,
+      "created": 1786631678710
+    },
+    {
+      "_id": "req_38448028f3eb4fb18f4e2bc9024132c0",
+      "_type": "request",
+      "parentId": "fld_0c464546503d42048a2fd3c17f211920",
+      "name": "GET Extrato (ledger)",
+      "description": "Lançamentos do razão paginados por cursor. Cada entrada traz direction (CREDIT/DEBIT), money, balanceBefore e balanceAfter. Se vier `nextCursor` na resposta, cole-o no parâmetro `cursor` para a próxima página. limit: inteiro 1..200, default 50.",
+      "url": "{{ _.baseUrl }}/wallets/{{ _.walletId }}/ledger",
+      "method": "GET",
+      "headers": [],
+      "parameters": [
+        {
+          "name": "limit",
+          "value": "50",
+          "description": "Inteiro entre 1 e 200. Default 50 se omitido."
+        },
+        {
+          "name": "cursor",
+          "value": "",
+          "disabled": true,
+          "description": "nextCursor da página anterior. Deixe desabilitado na primeira página."
+        }
+      ],
+      "modified": 1786631682950,
+      "created": 1786631682950
+    },
+    {
+      "_id": "req_30f39147a53745faadf0a21df7d60353",
+      "_type": "request",
+      "parentId": "fld_0c464546503d42048a2fd3c17f211920",
+      "name": "POST Reconciliação",
+      "description": "Recalcula o saldo somando o ledger e compara com o saldo armazenado. Sem body. Retorna 200 MESMO quando inconsistente — a divergência é o conteúdo da resposta (`consistent: false` + `difference`), não uma falha; um 5xx faria o monitor tratar o endpoint como fora do ar.",
+      "url": "{{ _.baseUrl }}/wallets/{{ _.walletId }}/reconciliation",
+      "method": "POST",
+      "headers": [],
+      "parameters": [],
+      "modified": 1786631685818,
+      "created": 1786631685818
+    },
+    {
+      "_id": "req_a00bba698df24b01bde0c6bc8f6b6d6a",
+      "_type": "request",
+      "parentId": "fld_30bdcd6368a84f868edd8f6ba74370e0",
+      "name": "POST 1. BET (débito)",
+      "description": "Aposta: debita a carteira. Envie primeiro — REFUND e ROLLBACK referenciam este externalTransactionId.\n\nSTATUS: 201 processed | 200 replay (idempotentReplay: true) | 202 pending_reference | 422 rejected (com failureCode) | 409 conflito | 400 payload inválido | 404 wallet inexistente | 503 falha transitória.\n\nDUAS UNICIDADES INDEPENDENTES, e é fácil confundir:\n· Idempotency-Key — reenviar igual devolve 200 + idempotentReplay: true; reenviar com payload diferente devolve 409 IDEMPOTENCY_PAYLOAD_MISMATCH.\n· (providerId, externalTransactionId) — reenviar a MESMA transação sob uma key NOVA devolve 409 DUPLICATE_PROVIDER_TRANSACTION. Não é replay de propósito: aceitar deixaria o provedor trocar o valor de uma transação já processada.\n\nO header Idempotency-Key é obrigatório; vazio ou ausente é 400. Para gerar um novo a cada envio, troque o valor por {% raw %}{% uuid 'v4' %}{% endraw %}.",
+      "url": "{{ _.baseUrl }}/wagering/transactions",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Idempotency-Key",
+          "value": "idem-bet-0100",
+          "description": "Obrigatório. Fonte da verdade da deduplicação — reenviar com o mesmo valor retorna 200 + idempotentReplay: true."
+        }
+      ],
+      "parameters": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"providerId\": \"{{ _.providerId }}\",\n  \"externalTransactionId\": \"bet-0100\",\n  \"playerId\": \"{{ _.playerId }}\",\n  \"walletId\": \"{{ _.walletId }}\",\n  \"roundId\": \"round-0100\",\n  \"gameId\": \"sweet-bonanza\",\n  \"kind\": \"BET\",\n  \"money\": {\n    \"amount\": \"50.00\",\n    \"currency\": \"{{ _.currency }}\"\n  }\n}"
+      },
+      "modified": 1786661075409,
+      "created": 1786631718846
+    },
+    {
+      "_id": "req_ad95ab5149234b5391a14963b86013a9",
+      "_type": "request",
+      "parentId": "fld_30bdcd6368a84f868edd8f6ba74370e0",
+      "name": "POST 2. WIN (crédito)",
+      "description": "Prêmio: credita a carteira. Mesmo roundId do BET. Não exige referenceExternalTransactionId.",
+      "url": "{{ _.baseUrl }}/wagering/transactions",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Idempotency-Key",
+          "value": "idem-win-0100",
+          "description": "Obrigatório."
+        }
+      ],
+      "parameters": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"providerId\": \"{{ _.providerId }}\",\n  \"externalTransactionId\": \"win-0100\",\n  \"playerId\": \"{{ _.playerId }}\",\n  \"walletId\": \"{{ _.walletId }}\",\n  \"roundId\": \"round-0100\",\n  \"gameId\": \"sweet-bonanza\",\n  \"kind\": \"WIN\",\n  \"money\": {\n    \"amount\": \"120.00\",\n    \"currency\": \"{{ _.currency }}\"\n  }\n}"
+      },
+      "modified": 1786632530070,
+      "created": 1786631723784
+    },
+    {
+      "_id": "req_dd0104d382274fb3815703464b9e5929",
+      "_type": "request",
+      "parentId": "fld_30bdcd6368a84f868edd8f6ba74370e0",
+      "name": "POST 3. LOSS (perda da rodada)",
+      "description": "Fechamento da rodada sem prêmio, em outro roundId — não faz sentido junto com o WIN da mesma rodada.\n\nATENÇÃO: o domínio exige valor POSITIVO. Enviar \"0.00\" retorna 400 VALIDATION_ERROR (\"transação exige valor positivo\"). Verificado contra a API rodando.\n\nLOSS não altera o saldo — o débito já ocorreu no BET. Serve para registrar o desfecho da rodada no ledger.",
+      "url": "{{ _.baseUrl }}/wagering/transactions",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Idempotency-Key",
+          "value": "idem-loss-0100",
+          "description": "Obrigatório."
+        }
+      ],
+      "parameters": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"providerId\": \"{{ _.providerId }}\",\n  \"externalTransactionId\": \"loss-0100\",\n  \"playerId\": \"{{ _.playerId }}\",\n  \"walletId\": \"{{ _.walletId }}\",\n  \"roundId\": \"round-0101\",\n  \"gameId\": \"sweet-bonanza\",\n  \"kind\": \"LOSS\",\n  \"money\": {\n    \"amount\": \"25.00\",\n    \"currency\": \"{{ _.currency }}\"\n  }\n}"
+      },
+      "modified": 1786632532762,
+      "created": 1786631728090
+    },
+    {
+      "_id": "req_a42314ba8e134a0dbf48816e7375b12f",
+      "_type": "request",
+      "parentId": "fld_30bdcd6368a84f868edd8f6ba74370e0",
+      "name": "POST 4. REFUND (estorna o BET)",
+      "description": "REFUND exige referenceExternalTransactionId e só reverte BET (REFUNDABLE_KINDS). Envie o request 1 (BET) antes — é ele que cria bet-0100.\n\nOmitir a referência retorna 422 REFERENCE_REQUIRED (\"REFUND exige referenceExternalTransactionId\") — verificado contra a API.\n\nSe a referência ainda não chegou (mensagem fora de ordem), a resposta é 202 pending_reference e um worker reprocessa com backoff 2^n até 8 tentativas (~15 min) — ver PENDING_REFERENCE_* no .env.",
+      "url": "{{ _.baseUrl }}/wagering/transactions",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Idempotency-Key",
+          "value": "idem-refund-0100",
+          "description": "Obrigatório."
+        }
+      ],
+      "parameters": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"providerId\": \"{{ _.providerId }}\",\n  \"externalTransactionId\": \"refund-0100\",\n  \"playerId\": \"{{ _.playerId }}\",\n  \"walletId\": \"{{ _.walletId }}\",\n  \"roundId\": \"round-0100\",\n  \"gameId\": \"sweet-bonanza\",\n  \"kind\": \"REFUND\",\n  \"money\": {\n    \"amount\": \"50.00\",\n    \"currency\": \"{{ _.currency }}\"\n  },\n  \"referenceExternalTransactionId\": \"bet-0100\"\n}"
+      },
+      "modified": 1786632541509,
+      "created": 1786631736889
+    },
+    {
+      "_id": "req_7f533452519c40889f63e3bb70681517",
+      "_type": "request",
+      "parentId": "fld_30bdcd6368a84f868edd8f6ba74370e0",
+      "name": "POST 5. ROLLBACK (reverte BET/WIN/REFUND)",
+      "description": "ROLLBACK também exige referenceExternalTransactionId, mas aceita alvo mais amplo que o REFUND: BET, WIN ou REFUND (ROLLBACKABLE_KINDS). Aqui aponta para win-0100 — envie o request 2 (WIN) antes. Troque para bet-0100 se quiser reverter a aposta.",
+      "url": "{{ _.baseUrl }}/wagering/transactions",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Idempotency-Key",
+          "value": "idem-rollback-0100",
+          "description": "Obrigatório."
+        }
+      ],
+      "parameters": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"providerId\": \"{{ _.providerId }}\",\n  \"externalTransactionId\": \"rollback-0100\",\n  \"playerId\": \"{{ _.playerId }}\",\n  \"walletId\": \"{{ _.walletId }}\",\n  \"roundId\": \"round-0100\",\n  \"gameId\": \"sweet-bonanza\",\n  \"kind\": \"ROLLBACK\",\n  \"money\": {\n    \"amount\": \"120.00\",\n    \"currency\": \"{{ _.currency }}\"\n  },\n  \"referenceExternalTransactionId\": \"win-0100\"\n}"
+      },
+      "modified": 1786632545761,
+      "created": 1786631743233
+    },
+    {
+      "_id": "req_0b94ce92b131450195db0b8725b67595",
+      "_type": "request",
+      "parentId": "fld_30bdcd6368a84f868edd8f6ba74370e0",
+      "name": "GET Transação por ID interno",
+      "description": "Cole em transactionId o valor retornado por qualquer POST acima. UUIDv7 obrigatório — ParseUUIDPipe({ version: '7' }) devolve 400 para v4.",
+      "url": "{{ _.baseUrl }}/wagering/transactions/{{ _.transactionId }}",
+      "method": "GET",
+      "headers": [],
+      "parameters": [],
+      "modified": 1786631746056,
+      "created": 1786631746056
+    },
+    {
+      "_id": "req_5a8a01eca4e94a1d8b047c9843848615",
+      "_type": "request",
+      "parentId": "fld_30bdcd6368a84f868edd8f6ba74370e0",
+      "name": "GET Transação por provider + external ID",
+      "description": "Consulta pela chave do provedor, sem precisar guardar o ID interno. É esta que o provedor usa para conciliar. Ambos os segmentos são strings livres (1..128), sem validação de UUID.",
+      "url": "{{ _.baseUrl }}/providers/{{ _.providerId }}/wagering/transactions/{{ _.externalTransactionId }}",
+      "method": "GET",
+      "headers": [],
+      "parameters": [],
+      "modified": 1786631748512,
+      "created": 1786631748512
+    },
+    {
+      "_id": "env_1b237593a31d45a8a4f78bb5ac46a9da",
+      "_type": "environment",
+      "parentId": "wrk_b03cf9b960f44d5aba106dc83cf1295a",
+      "name": "Local (docker compose)",
+      "description": "Base environment variables",
+      "data": {
+        "baseUrl": "http://localhost:3000",
+        "playerId": "0192f28f-5dc0-7d58-bdb2-814ad6a0f4a1",
+        "walletId": "019ffff0-0000-7000-8000-000000000001",
+        "transactionId": "019ffff0-0000-7000-8000-000000000002",
+        "providerId": "acme-games",
+        "currency": "BRL",
+        "externalTransactionId": "bet-0100"
+      },
+      "modified": 1786659350188,
+      "created": 1786631647679
+    }
+  ]
+}
