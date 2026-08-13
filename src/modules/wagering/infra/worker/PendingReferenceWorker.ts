@@ -114,8 +114,7 @@ export class PendingReferenceWorker implements OnModuleInit, OnApplicationShutdo
       await CorrelationContext.run(
         { correlationId: CorrelationContext.newCorrelationId(), transactionId: transaction.id },
         async () => {
-          await this.retryOne(transaction.id);
-          handled += 1;
+          if (await this.retryOne(transaction.id, transaction.walletId)) handled += 1;
         },
       );
     }
@@ -123,16 +122,26 @@ export class PendingReferenceWorker implements OnModuleInit, OnApplicationShutdo
   }
 
   /**
-   * Recarrega em vez de reaproveitar o objeto do claim: outro processo pode
-   * tê-la resolvido nesse meio-tempo, e o estado obsoleto duplicaria a reversão.
+   * `claimDuePendingReferences` NÃO é um lease: o `FOR UPDATE SKIP LOCKED` morre
+   * junto com a transação do claim, então dois workers pegam a mesma linha. Quem
+   * serializa é o lock da wallet — e por isso ele vem primeiro, como em todo o
+   * resto do sistema.
+   *
+   * Reler a transação ANTES do lock não adianta: os dois leem PENDING_REFERENCE,
+   * o vencedor processa e o perdedor decide em cima de estado obsoleto —
+   * gravando REJECTED por cima de um PROCESSED que já lançou no ledger.
    */
-  private async retryOne(transactionId: string): Promise<void> {
-    await this.uow.run(async () => {
-      const transaction = await this.transactions.findById(transactionId);
-      if (!transaction || transaction.status !== WagerTransactionStatus.PendingReference) return;
+  private async retryOne(transactionId: string, walletId: string): Promise<boolean> {
+    return this.uow.run(async () => {
+      const wallet = await this.wallets.findByIdForUpdate(walletId);
+      if (!wallet) return false;
 
-      const wallet = await this.wallets.findByIdForUpdate(transaction.walletId);
-      if (!wallet) return;
+      // Só DEPOIS do lock o estado é confiável. Não inverta estas duas linhas:
+      // test/concurrency/pendingReference.test.ts falha se você inverter.
+      const transaction = await this.transactions.findById(transactionId);
+      if (!transaction || transaction.status !== WagerTransactionStatus.PendingReference) {
+        return false;
+      }
 
       const now = this.clock.now();
       this.metrics.retriesTotal.inc({ reason: 'pending_reference' });
@@ -154,18 +163,19 @@ export class PendingReferenceWorker implements OnModuleInit, OnApplicationShutdo
               ),
               now,
             );
-            return;
+            return true;
           }
 
           await this.transactions.update(transaction);
-          return;
+          return true;
         }
 
         await this.applyResolved(transaction, wallet, resolution.reference, now);
+        return true;
       } catch (error: unknown) {
         if (error instanceof BusinessRuleError) {
           await this.reject(transaction, wallet.balance, error, now);
-          return;
+          return true;
         }
         throw error;
       }

@@ -46,9 +46,10 @@ interface TransactionRow {
 async function rowOf(externalId: string): Promise<TransactionRow | undefined> {
   const rows = await orm.em
     .getConnection()
-    .execute<
-      TransactionRow[]
-    >(`SELECT status, failure_code FROM wager_transactions WHERE external_transaction_id = ?`, [externalId]);
+    .execute<TransactionRow[]>(
+      `SELECT status, failure_code FROM wager_transactions WHERE external_transaction_id = ?`,
+      [externalId],
+    );
   return rows[0];
 }
 
