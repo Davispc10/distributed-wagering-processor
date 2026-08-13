@@ -674,4 +674,4 @@ primeira perna de todo par válido.
 | §10 consumidor SQS | `WagerTransactionConsumer`, mesmo use case do HTTP |
 | §11 outbox | `OutboxPublisherWorker` com `SKIP LOCKED` + lease |
 | §12 observabilidade | seção 11 deste documento |
-| §13 testes | ver `README.md` e `docs/EVALUATION-CHECKLIST.md` |
+| §13 testes | `test/unit`, `test/integration`, `test/concurrency`; ver `README.md` |

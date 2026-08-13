@@ -413,7 +413,6 @@ lint. Detalhes em [`ARCHITECTURE.md`](ARCHITECTURE.md).
 |---|---|
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | decisões, trade-offs, alternativas descartadas, premissas e limitações |
 | [`docs/LOAD-TEST.md`](docs/LOAD-TEST.md) | teste de carga: ambiente, metodologia, números e limitações |
-| [`docs/EVALUATION-CHECKLIST.md`](docs/EVALUATION-CHECKLIST.md) | mapeamento requisito → implementação → teste |
 | [`docs/CHALLENGE.md`](docs/CHALLENGE.md) | enunciado original |
 | [`docs/insomnia-collection.json`](docs/insomnia-collection.json) | collection do Insomnia com os 10 endpoints |
 | [`AGENTS.md`](AGENTS.md) | convenções para quem for mexer no código |
