@@ -312,12 +312,12 @@ SEED_COUNT=200 bun run queues:seed
 
 ## Testes
 
-**256 testes**, com PostgreSQL e MiniStack **reais** em containers.
+**264 testes**, com PostgreSQL e MiniStack **reais** em containers.
 
 ```
-bun run test:unit          181 pass    (domínio e aplicação)
-bun run test:integration    63 pass    (constraints, atomicidade, regras de negócio, mensageria, double-entry)
-bun run test:concurrency    12 pass    (os 8 cenários da seção 13)
+bun run test:unit          182 pass    (domínio e aplicação)
+bun run test:integration    68 pass    (constraints, atomicidade, regras de negócio, mensageria, double-entry)
+bun run test:concurrency    14 pass    (os 8 cenários da seção 13 + disputa por referência pendente)
 ```
 
 Toda suíte de integração e concorrência termina afirmando a mesma invariante:
@@ -338,6 +338,7 @@ wallet.balance == saldo reconstruído pelo ledger
 | 6 | 2 publishers, 25 eventos | outbox drenada, `attempts = 0` |
 | 7 | `ROLLBACK` antes da `BET` | `202` → worker resolve quando a referência chega |
 | 8 | Todos os workers derrubados e substituídos | trabalho pendente retomado |
+| + | 3 workers disputando a mesma `PENDING_REFERENCE` | resolvida **uma** vez; nenhuma `REJECTED` com lançamento |
 
 Instâncias sobem como **processos separados** (`bun spawn`), não módulos em
 memória — só assim o lock disputado é o do PostgreSQL.

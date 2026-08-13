@@ -447,8 +447,6 @@ depois do efeito, e não um `UPDATE` solto no repositório.
 `REFUND`/`ROLLBACK` cuja referência ainda não chegou vira `PENDING_REFERENCE`
 (HTTP `202`) e é reprocessada pelo `PendingReferenceWorker`.
 
-- Claim com `FOR UPDATE SKIP LOCKED` — dois workers não disputam a mesma
-  transação.
 - Backoff exponencial `2^n` segundos, teto de **60s**, máximo de **8 tentativas**
   (~2 minutos de janela efetiva de espera acumulada).
 - Esgotado o limite: `REJECTED` com `REFERENCE_NOT_FOUND` e evento publicado. A
@@ -461,9 +459,34 @@ indefinidamente. Uma janela maior aumentaria a chance de resolver casos raros ao
 custo de manter estado pendente por mais tempo; é um parâmetro de configuração
 (`PENDING_REFERENCE_MAX_ATTEMPTS`), não uma constante.
 
-O worker **recarrega a transação dentro da transação SQL** em vez de reaproveitar
-o objeto do claim: entre um e outro, outro processo pode tê-la resolvido, e
-aplicar estado obsoleto produziria dupla reversão.
+### O claim NÃO é um lease — quem serializa é a wallet
+
+`claimDuePendingReferences` usa `FOR UPDATE SKIP LOCKED`, mas o lock morre junto
+com a transação do claim, que commita antes do trabalho começar. Não há
+`locked_by`/`locked_until` como no outbox. **Então dois workers reivindicam a
+mesma linha, e isso é esperado.**
+
+O que garante a correção é o lock da wallet, e por isso a ordem dentro de
+`retryOne` é rígida:
+
+```
+1. SELECT ... FOR UPDATE na wallet     ← o mutex
+2. reler a transação                    ← só agora o estado é confiável
+3. se não for mais PENDING_REFERENCE, sair
+```
+
+Inverter 1 e 2 parece equivalente e não é: os dois workers leriam
+`PENDING_REFERENCE`, serializariam no lock da wallet, o vencedor processaria e o
+**perdedor decidiria em cima de estado obsoleto**. Na prática ele resolvia a
+referência de novo, via a reversão recém-criada pelo vencedor, levantava
+`REFERENCE_ALREADY_REVERSED` e gravava `REJECTED` por cima de um `PROCESSED` que
+já tinha lançado no ledger — produzindo uma transação `REJECTED` **com**
+lançamento, que viola a regra 7.6 e faz o provedor concluir que o dinheiro não
+voltou quando ele voltou.
+
+Coberto por `test/concurrency/pendingReference.test.ts`, com 3 workers reais
+disputando a mesma linha. O teste falha de forma determinística se a ordem for
+invertida.
 
 ---
 
